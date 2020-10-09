@@ -1,3 +1,3 @@
-const { startTestApp } = require('./helpers/testAppGenerator');
+const { startTestApp } = require('./helpers/test-app-generator');
 
 startTestApp({ appName: 'testApp' });

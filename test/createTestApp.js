@@ -1,4 +1,4 @@
-const { cleanTestApp, generateTestApp } = require('./helpers/testAppGenerator');
+const { cleanTestApp, generateTestApp } = require('./helpers/test-app-generator');
 const yargs = require('yargs');
 
 const appName = 'testApp';
