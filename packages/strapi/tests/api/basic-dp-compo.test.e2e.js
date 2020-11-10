@@ -1,11 +1,11 @@
 const _ = require('lodash');
 
-const { registerAndLogin } = require('../../../../test/helpers/auth');
-const createModelsUtils = require('../../../../test/helpers/models');
+const { createStrapiInstance } = require('../../../../test/helpers/strapi');
+const modelsUtils = require('../../../../test/helpers/models');
 const { createAuthRequest } = require('../../../../test/helpers/request');
 
+let strapi;
 let rq;
-let modelsUtils;
 let data = {
   productsWithCompoAndDP: [],
 };
@@ -37,41 +37,39 @@ const productWithCompoAndDP = {
       type: 'component',
       component: 'default.compo',
       required: true,
-      repeatable: true,
     },
   },
   connection: 'default',
   draftAndPublish: true,
-  name: 'product with compo and DP',
+  name: 'product-with-compo-and-dp',
   description: '',
   collectionName: '',
 };
 
 describe('Core API - Basic + compo + draftAndPublish', () => {
   beforeAll(async () => {
-    const token = await registerAndLogin();
-    rq = createAuthRequest(token);
-
-    modelsUtils = createModelsUtils({ rq });
     await modelsUtils.createComponent(compo);
     await modelsUtils.createContentTypes([productWithCompoAndDP]);
+
+    strapi = await createStrapiInstance({ ensureSuperAdmin: true });
+    rq = await createAuthRequest({ strapi });
   }, 60000);
 
   afterAll(async () => {
-    await modelsUtils.deleteComponent('default.compo');
-    await modelsUtils.deleteContentTypes(['product-with-compo-and-dp']);
+    await strapi.destroy();
+    await modelsUtils.cleanupModel(productWithCompoAndDP.name);
+    await modelsUtils.deleteContentType(productWithCompoAndDP.name);
+    await modelsUtils.deleteComponent(`default.${compo.name}`);
   }, 60000);
 
   test('Create product with compo', async () => {
     const product = {
       name: 'Product 1',
       description: 'Product description',
-      compo: [
-        {
-          name: 'compo name',
-          description: 'short',
-        },
-      ],
+      compo: {
+        name: 'compo name',
+        description: 'short',
+      },
     };
     const res = await rq({
       method: 'POST',
@@ -104,12 +102,10 @@ describe('Core API - Basic + compo + draftAndPublish', () => {
     const product = {
       name: 'Product 1 updated',
       description: 'Updated Product description',
-      compo: [
-        {
-          name: 'compo name updated',
-          description: 'update',
-        },
-      ],
+      compo: {
+        name: 'compo name updated',
+        description: 'update',
+      },
     };
     const res = await rq({
       method: 'PUT',
@@ -150,19 +146,17 @@ describe('Core API - Basic + compo + draftAndPublish', () => {
       });
 
       expect(res.statusCode).toBe(400);
-      expect(_.get(res.body.data, ['errors', 'compo', '0'])).toBe('compo must be defined.');
+      expect(_.get(res, 'body.data.errors.compo.0')).toBe('compo must be defined.');
     });
 
     test('Cannot create product with compo - minLength', async () => {
       const product = {
         name: 'Product 1',
         description: 'Product description',
-        compo: [
-          {
-            name: 'compo name',
-            description: '',
-          },
-        ],
+        compo: {
+          name: 'compo name',
+          description: '',
+        },
       };
       const res = await rq({
         method: 'POST',
@@ -171,8 +165,8 @@ describe('Core API - Basic + compo + draftAndPublish', () => {
       });
 
       expect(res.statusCode).toBe(400);
-      expect(_.get(res.body.data, ['errors', 'compo[0].description', '0'])).toBe(
-        'compo[0].description must be at least 3 characters'
+      expect(_.get(res.body.data, ['errors', 'compo.description', '0'])).toBe(
+        'compo.description must be at least 3 characters'
       );
     });
 
@@ -180,12 +174,10 @@ describe('Core API - Basic + compo + draftAndPublish', () => {
       const product = {
         name: 'Product 1',
         description: 'Product description',
-        compo: [
-          {
-            name: 'compo name',
-            description: 'A very long description that exceed the min length.',
-          },
-        ],
+        compo: {
+          name: 'compo name',
+          description: 'A very long description that exceed the min length.',
+        },
       };
       const res = await rq({
         method: 'POST',
@@ -194,8 +186,8 @@ describe('Core API - Basic + compo + draftAndPublish', () => {
       });
 
       expect(res.statusCode).toBe(400);
-      expect(_.get(res.body.data, ['errors', 'compo[0].description', '0'])).toBe(
-        'compo[0].description must be at most 10 characters'
+      expect(_.get(res.body.data, ['errors', 'compo.description', '0'])).toBe(
+        'compo.description must be at most 10 characters'
       );
     });
 
@@ -203,11 +195,9 @@ describe('Core API - Basic + compo + draftAndPublish', () => {
       const product = {
         name: 'Product 1',
         description: 'Product description',
-        compo: [
-          {
-            description: 'short',
-          },
-        ],
+        compo: {
+          description: 'short',
+        },
       };
       const res = await rq({
         method: 'POST',
@@ -216,8 +206,8 @@ describe('Core API - Basic + compo + draftAndPublish', () => {
       });
 
       expect(res.statusCode).toBe(400);
-      expect(_.get(res.body.data, ['errors', 'compo[0].name', '0'])).toBe(
-        'compo[0].name must be defined.'
+      expect(_.get(res.body.data, ['errors', 'compo.name', '0'])).toBe(
+        'compo.name must be defined.'
       );
     });
   });

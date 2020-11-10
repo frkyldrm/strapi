@@ -1,11 +1,11 @@
 const _ = require('lodash');
 
-const { registerAndLogin } = require('../../../../test/helpers/auth');
-const createModelsUtils = require('../../../../test/helpers/models');
+const { createStrapiInstance } = require('../../../../test/helpers/strapi');
+const modelsUtils = require('../../../../test/helpers/models');
 const { createAuthRequest } = require('../../../../test/helpers/request');
 
+let strapi;
 let rq;
-let modelsUtils;
 let data = {
   productsWithCompo: [],
 };
@@ -41,24 +41,25 @@ const productWithCompo = {
     },
   },
   connection: 'default',
-  name: 'product with compo',
+  name: 'product-with-compo',
   description: '',
   collectionName: '',
 };
 
 describe('Core API - Basic + compo', () => {
   beforeAll(async () => {
-    const token = await registerAndLogin();
-    rq = createAuthRequest(token);
-
-    modelsUtils = createModelsUtils({ rq });
     await modelsUtils.createComponent(compo);
     await modelsUtils.createContentTypes([productWithCompo]);
+
+    strapi = await createStrapiInstance({ ensureSuperAdmin: true });
+    rq = await createAuthRequest({ strapi });
   }, 60000);
 
   afterAll(async () => {
-    await modelsUtils.deleteComponent('default.compo');
-    await modelsUtils.deleteContentTypes(['product-with-compo']);
+    await strapi.destroy();
+    await modelsUtils.cleanupModel(productWithCompo.name);
+    await modelsUtils.deleteContentType(productWithCompo.name);
+    await modelsUtils.deleteComponent(`default.${compo.name}`);
   }, 60000);
 
   test('Create product with compo', async () => {

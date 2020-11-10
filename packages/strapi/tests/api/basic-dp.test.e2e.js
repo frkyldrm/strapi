@@ -1,11 +1,11 @@
 const _ = require('lodash');
 
-const { registerAndLogin } = require('../../../../test/helpers/auth');
-const createModelsUtils = require('../../../../test/helpers/models');
+const { createStrapiInstance } = require('../../../../test/helpers/strapi');
+const modelsUtils = require('../../../../test/helpers/models');
 const { createAuthRequest } = require('../../../../test/helpers/request');
 
+let strapi;
 let rq;
-let modelsUtils;
 let data = {
   products: [],
 };
@@ -39,30 +39,25 @@ const productWithDP = {
   },
   connection: 'default',
   draftAndPublish: true,
-  name: 'product with DP',
+  name: 'product-with-dp',
   description: '',
   collectionName: '',
 };
 
 describe('Core API - Basic + draftAndPublish', () => {
   beforeAll(async () => {
-    const token = await registerAndLogin();
-    rq = createAuthRequest(token);
-
-    modelsUtils = createModelsUtils({ rq });
     await modelsUtils.createComponent(compo);
-    await modelsUtils.createContentTypes([productWithDP]);
+    await modelsUtils.createContentType(productWithDP);
+
+    strapi = await createStrapiInstance({ ensureSuperAdmin: true });
+    rq = await createAuthRequest({ strapi });
   }, 60000);
 
   afterAll(async () => {
-    // clean database
-    const queryString = data.products.map((p, i) => `${i}=${p.id}`).join('&');
-    await rq({
-      method: 'DELETE',
-      url: `/content-manager/explorer/deleteAll/application::product-with-dp.product-with-dp?${queryString}`,
-    });
-    await modelsUtils.deleteComponent('default.compo');
-    await modelsUtils.deleteContentTypes(['product-with-dp']);
+    await strapi.destroy();
+    await modelsUtils.cleanupModel(productWithDP.name);
+    await modelsUtils.deleteComponent(`default.${compo.name}`);
+    await modelsUtils.deleteContentTypes([productWithDP.name]);
   }, 60000);
 
   test('Create a product', async () => {
