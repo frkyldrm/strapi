@@ -12,21 +12,17 @@ const cleanDate = entry => {
   delete entry.updated_at;
 };
 
+const builder = createTestBuilder();
 let data;
 let rq;
 let strapi;
-const builder = createTestBuilder();
 
 describe('Create Strapi API End to End', () => {
   beforeAll(async () => {
     await builder
-      .addContentTypes([
-        form.article,
-        form.tag,
-        form.category,
-        form.reference,
-        form.product
-      ], { batch: true })
+      .addContentTypes([form.article, form.tag, form.category, form.reference, form.product], {
+        batch: true,
+      })
       .build();
 
     strapi = await createStrapiInstance({ ensureSuperAdmin: true });
@@ -612,8 +608,7 @@ describe('Create Strapi API End to End', () => {
         method: 'GET',
       });
 
-      if (!referenceToGet.tag || Object.keys(referenceToGet.tag).length == 0)
-        return;
+      if (!referenceToGet.tag || Object.keys(referenceToGet.tag).length === 0) return;
       expect(referenceToGet.tag).toBe(null);
     });
   });

@@ -1,11 +1,12 @@
 const { createStrapiInstance } = require('../../../../test/helpers/strapi');
-const modelsUtils = require('../../../../test/helpers/models');
+const { createTestBuilder } = require('../../../../test/helpers/builder');
 const { createAuthRequest } = require('../../../../test/helpers/request');
 
+const builder = createTestBuilder();
 let strapi;
 let rq;
 let data = {
-  products: [],
+  product: [],
 };
 
 const product = {
@@ -40,8 +41,10 @@ const compo = {
 
 describe('Core API - Basic', () => {
   beforeAll(async () => {
-    await modelsUtils.createComponent(compo);
-    await modelsUtils.createContentTypes([product]);
+    await builder
+      .addComponent(compo)
+      .addContentType(product)
+      .build();
 
     strapi = await createStrapiInstance({ ensureSuperAdmin: true });
     rq = await createAuthRequest({ strapi });
@@ -49,9 +52,7 @@ describe('Core API - Basic', () => {
 
   afterAll(async () => {
     await strapi.destroy();
-    await modelsUtils.cleanupModel(product.name);
-    await modelsUtils.deleteContentType(product.name);
-    await modelsUtils.deleteComponent(`default.${compo.name}`);
+    await builder.cleanup();
   }, 60000);
 
   test('Create product', async () => {
@@ -68,7 +69,7 @@ describe('Core API - Basic', () => {
     expect(res.statusCode).toBe(200);
     expect(res.body).toMatchObject(product);
     expect(res.body.published_at).toBeUndefined();
-    data.products.push(res.body);
+    data.product.push(res.body);
   });
 
   test('Read product', async () => {
@@ -98,27 +99,27 @@ describe('Core API - Basic', () => {
     };
     const res = await rq({
       method: 'PUT',
-      url: `/products/${data.products[0].id}`,
+      url: `/products/${data.product[0].id}`,
       body: product,
     });
 
     expect(res.statusCode).toBe(200);
     expect(res.body).toMatchObject(product);
-    expect(res.body.id).toEqual(data.products[0].id);
+    expect(res.body.id).toEqual(data.product[0].id);
     expect(res.body.published_at).toBeUndefined();
-    data.products[0] = res.body;
+    data.product[0] = res.body;
   });
 
   test('Delete product', async () => {
     const res = await rq({
       method: 'DELETE',
-      url: `/products/${data.products[0].id}`,
+      url: `/products/${data.product[0].id}`,
     });
 
     expect(res.statusCode).toBe(200);
-    expect(res.body).toMatchObject(data.products[0]);
-    expect(res.body.id).toEqual(data.products[0].id);
+    expect(res.body).toMatchObject(data.product[0]);
+    expect(res.body.id).toEqual(data.product[0].id);
     expect(res.body.published_at).toBeUndefined();
-    data.products.shift();
+    data.product.shift();
   });
 });

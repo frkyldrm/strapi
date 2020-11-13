@@ -1,14 +1,13 @@
 // Test an API with all the possible filed types and simple filtering (no deep filtering, no relations)
 
 const { createStrapiInstance } = require('../../../test/helpers/strapi');
-const modelsUtils = require('../../../test/helpers/models');
+const { createTestBuilder } = require('../../../test/helpers/builder');
 const { createAuthRequest } = require('../../../test/helpers/request');
 
+const builder = createTestBuilder();
 let strapi;
 let rq;
-let data = {
-  products: [],
-};
+const data = { product: [] };
 
 // complete list of existing fields and tests
 const product = {
@@ -83,20 +82,20 @@ const productFixtures = [
 
 describe('Filtering API', () => {
   beforeAll(async () => {
-    await modelsUtils.createContentType(product);
-    await modelsUtils.cleanupModel(product.name);
-    await modelsUtils.createFixtures({ [product.name]: productFixtures });
+    await builder
+      .addContentType(product)
+      .addFixtures(product.name, productFixtures)
+      .build();
 
     strapi = await createStrapiInstance({ ensureSuperAdmin: true });
     rq = await createAuthRequest({ strapi });
 
-    data.products = (await rq({ method: 'GET', url: '/products' })).body;
+    Object.assign(data, builder.sanitizedFixtures(strapi));
   }, 60000);
 
   afterAll(async () => {
     await strapi.destroy();
-    await modelsUtils.cleanupModel(product.name);
-    await modelsUtils.deleteContentType(product.name);
+    await builder.cleanup();
   }, 60000);
 
   describe('Basic filters', () => {
@@ -112,7 +111,7 @@ describe('Filtering API', () => {
 
         expect(Array.isArray(res.body)).toBe(true);
         expect(res.body.length).toBe(1);
-        expect(res.body[0]).toMatchObject(data.products[0]);
+        expect(res.body[0]).toMatchObject(data.product[0]);
       });
 
       test('Should be usable with equal suffix', async () => {
@@ -126,7 +125,7 @@ describe('Filtering API', () => {
 
         expect(Array.isArray(res.body)).toBe(true);
         expect(res.body.length).toBe(1);
-        expect(res.body[0]).toMatchObject(data.products[0]);
+        expect(res.body[0]).toMatchObject(data.product[0]);
       });
 
       test('Should return an empty array when no match', async () => {
@@ -153,7 +152,7 @@ describe('Filtering API', () => {
         });
 
         expect(res.body).toEqual(
-          expect.arrayContaining(data.products.map(o => expect.objectContaining(o)))
+          expect.arrayContaining(data.product.map(o => expect.objectContaining(o)))
         );
       });
 
@@ -166,7 +165,7 @@ describe('Filtering API', () => {
           },
         });
 
-        expect(res.body).toEqual(expect.not.arrayContaining([data.products[0]]));
+        expect(res.body).toEqual(expect.not.arrayContaining([data.product[0]]));
       });
     });
 
@@ -180,7 +179,7 @@ describe('Filtering API', () => {
           },
         });
 
-        const matching = data.products.filter(x => x.price === null);
+        const matching = data.product.filter(x => x.price === null);
         res.body.sort((a, b) => (a.id > b.id ? 1 : -1));
         expect(Array.isArray(res.body)).toBe(true);
         expect(res.body.length).toBe(matching.length);
@@ -213,7 +212,7 @@ describe('Filtering API', () => {
         });
 
         expect(res1.body).toEqual(
-          expect.arrayContaining(data.products.map(o => expect.objectContaining(o)))
+          expect.arrayContaining(data.product.map(o => expect.objectContaining(o)))
         );
 
         const res2 = await rq({
@@ -261,7 +260,7 @@ describe('Filtering API', () => {
         });
 
         expect(res.body).toEqual(
-          expect.arrayContaining(data.products.map(o => expect.objectContaining(o)))
+          expect.arrayContaining(data.product.map(o => expect.objectContaining(o)))
         );
 
         const res2 = await rq({
@@ -321,7 +320,7 @@ describe('Filtering API', () => {
           },
         });
 
-        expect(res.body).toEqual(expect.arrayContaining([data.products[0]]));
+        expect(res.body).toEqual(expect.arrayContaining([data.product[0]]));
       });
     });
 
@@ -336,7 +335,7 @@ describe('Filtering API', () => {
           },
         });
 
-        expect(res.body).toEqual(expect.arrayContaining([data.products[0]]));
+        expect(res.body).toEqual(expect.arrayContaining([data.product[0]]));
       });
 
       test('Should return an empty array if the case matches', async () => {
@@ -362,7 +361,7 @@ describe('Filtering API', () => {
           },
         });
 
-        expect(res.body).toEqual(expect.arrayContaining([data.products[0]]));
+        expect(res.body).toEqual(expect.arrayContaining([data.product[0]]));
       });
 
       test('Should return the Product with an array of values', async () => {
@@ -374,7 +373,7 @@ describe('Filtering API', () => {
           },
         });
 
-        expect(res.body).toEqual(expect.arrayContaining([data.products[0]]));
+        expect(res.body).toEqual(expect.arrayContaining([data.product[0]]));
       });
 
       test('Should return a, empty array if no values are matching', async () => {
@@ -400,7 +399,7 @@ describe('Filtering API', () => {
           },
         });
 
-        expect(res.body).toEqual(expect.not.arrayContaining([data.products[0]]));
+        expect(res.body).toEqual(expect.not.arrayContaining([data.product[0]]));
       });
 
       test('Should return an array without the values matching when an array of values is provided', async () => {
@@ -412,7 +411,7 @@ describe('Filtering API', () => {
           },
         });
 
-        expect(res.body).toEqual(expect.not.arrayContaining([data.products[0]]));
+        expect(res.body).toEqual(expect.not.arrayContaining([data.product[0]]));
       });
 
       test('Should return an array with values that do not match the filter', async () => {
@@ -424,7 +423,7 @@ describe('Filtering API', () => {
           },
         });
 
-        expect(res.body).toEqual(expect.arrayContaining([data.products[0]]));
+        expect(res.body).toEqual(expect.arrayContaining([data.product[0]]));
       });
     });
 
@@ -438,7 +437,7 @@ describe('Filtering API', () => {
           },
         });
 
-        expect(res.body).toEqual(expect.not.arrayContaining([data.products[0]]));
+        expect(res.body).toEqual(expect.not.arrayContaining([data.product[0]]));
 
         const res2 = await rq({
           method: 'GET',
@@ -448,7 +447,7 @@ describe('Filtering API', () => {
           },
         });
 
-        expect(res2.body).toEqual(expect.arrayContaining([data.products[0]]));
+        expect(res2.body).toEqual(expect.arrayContaining([data.product[0]]));
       });
 
       test('Should work with integers', async () => {
@@ -460,7 +459,7 @@ describe('Filtering API', () => {
           },
         });
 
-        expect(res.body).toEqual(expect.arrayContaining([data.products[0]]));
+        expect(res.body).toEqual(expect.arrayContaining([data.product[0]]));
       });
 
       test('Should work with float', async () => {
@@ -472,7 +471,7 @@ describe('Filtering API', () => {
           },
         });
 
-        expect(res.body).toEqual(expect.arrayContaining([data.products[0]]));
+        expect(res.body).toEqual(expect.arrayContaining([data.product[0]]));
       });
 
       test('Should work with decimal', async () => {
@@ -484,7 +483,7 @@ describe('Filtering API', () => {
           },
         });
 
-        expect(res.body).toEqual(expect.arrayContaining([data.products[0]]));
+        expect(res.body).toEqual(expect.arrayContaining([data.product[0]]));
       });
 
       test('Should work with bigintegers', async () => {
@@ -496,7 +495,7 @@ describe('Filtering API', () => {
           },
         });
 
-        expect(res.body).toEqual(expect.arrayContaining([data.products[0]]));
+        expect(res.body).toEqual(expect.arrayContaining([data.product[0]]));
       });
     });
 
@@ -510,7 +509,7 @@ describe('Filtering API', () => {
           },
         });
 
-        expect(res.body).toEqual(expect.arrayContaining([data.products[0]]));
+        expect(res.body).toEqual(expect.arrayContaining([data.product[0]]));
 
         const res2 = await rq({
           method: 'GET',
@@ -520,7 +519,7 @@ describe('Filtering API', () => {
           },
         });
 
-        expect(res2.body).toEqual(expect.not.arrayContaining([data.products[0]]));
+        expect(res2.body).toEqual(expect.not.arrayContaining([data.product[0]]));
       });
 
       test('Should work with integers', async () => {
@@ -532,7 +531,7 @@ describe('Filtering API', () => {
           },
         });
 
-        expect(res.body).toEqual(expect.arrayContaining([data.products[0]]));
+        expect(res.body).toEqual(expect.arrayContaining([data.product[0]]));
       });
 
       test('Should work with float', async () => {
@@ -544,7 +543,7 @@ describe('Filtering API', () => {
           },
         });
 
-        expect(res.body).toEqual(expect.arrayContaining([data.products[0]]));
+        expect(res.body).toEqual(expect.arrayContaining([data.product[0]]));
       });
 
       test('Should work with decimal', async () => {
@@ -556,7 +555,7 @@ describe('Filtering API', () => {
           },
         });
 
-        expect(res.body).toEqual(expect.arrayContaining([data.products[0]]));
+        expect(res.body).toEqual(expect.arrayContaining([data.product[0]]));
       });
 
       test('Should work with bigintegers', async () => {
@@ -568,7 +567,7 @@ describe('Filtering API', () => {
           },
         });
 
-        expect(res.body).toEqual(expect.arrayContaining([data.products[0]]));
+        expect(res.body).toEqual(expect.arrayContaining([data.product[0]]));
       });
     });
 
@@ -582,7 +581,7 @@ describe('Filtering API', () => {
           },
         });
 
-        expect(res.body).toEqual(expect.not.arrayContaining([data.products[0]]));
+        expect(res.body).toEqual(expect.not.arrayContaining([data.product[0]]));
 
         const res2 = await rq({
           method: 'GET',
@@ -592,7 +591,7 @@ describe('Filtering API', () => {
           },
         });
 
-        expect(res2.body).toEqual(expect.arrayContaining([data.products[0]]));
+        expect(res2.body).toEqual(expect.arrayContaining([data.product[0]]));
       });
 
       test('Should work with integers', async () => {
@@ -604,7 +603,7 @@ describe('Filtering API', () => {
           },
         });
 
-        expect(res.body).toEqual(expect.arrayContaining([data.products[0]]));
+        expect(res.body).toEqual(expect.arrayContaining([data.product[0]]));
       });
 
       test('Should work with float', async () => {
@@ -616,7 +615,7 @@ describe('Filtering API', () => {
           },
         });
 
-        expect(res.body).toEqual(expect.arrayContaining([data.products[0]]));
+        expect(res.body).toEqual(expect.arrayContaining([data.product[0]]));
       });
 
       test('Should work with decimal', async () => {
@@ -628,7 +627,7 @@ describe('Filtering API', () => {
           },
         });
 
-        expect(res.body).toEqual(expect.arrayContaining([data.products[0]]));
+        expect(res.body).toEqual(expect.arrayContaining([data.product[0]]));
       });
 
       test('Should work with bigintegers', async () => {
@@ -640,7 +639,7 @@ describe('Filtering API', () => {
           },
         });
 
-        expect(res.body).toEqual(expect.arrayContaining([data.products[0]]));
+        expect(res.body).toEqual(expect.arrayContaining([data.product[0]]));
       });
     });
 
@@ -654,7 +653,7 @@ describe('Filtering API', () => {
           },
         });
 
-        expect(res.body).toEqual(expect.arrayContaining([data.products[0]]));
+        expect(res.body).toEqual(expect.arrayContaining([data.product[0]]));
 
         const res2 = await rq({
           method: 'GET',
@@ -664,7 +663,7 @@ describe('Filtering API', () => {
           },
         });
 
-        expect(res2.body).toEqual(expect.not.arrayContaining([data.products[0]]));
+        expect(res2.body).toEqual(expect.not.arrayContaining([data.product[0]]));
       });
 
       test('Should work with integers', async () => {
@@ -676,7 +675,7 @@ describe('Filtering API', () => {
           },
         });
 
-        expect(res.body).toEqual(expect.arrayContaining([data.products[0]]));
+        expect(res.body).toEqual(expect.arrayContaining([data.product[0]]));
       });
 
       test('Should work with float', async () => {
@@ -688,7 +687,7 @@ describe('Filtering API', () => {
           },
         });
 
-        expect(res.body).toEqual(expect.arrayContaining([data.products[0]]));
+        expect(res.body).toEqual(expect.arrayContaining([data.product[0]]));
       });
 
       test('Should work with decimal', async () => {
@@ -700,7 +699,7 @@ describe('Filtering API', () => {
           },
         });
 
-        expect(res.body).toEqual(expect.arrayContaining([data.products[0]]));
+        expect(res.body).toEqual(expect.arrayContaining([data.product[0]]));
       });
 
       test('Should work with bigintegers', async () => {
@@ -712,7 +711,7 @@ describe('Filtering API', () => {
           },
         });
 
-        expect(res.body).toEqual(expect.arrayContaining([data.products[0]]));
+        expect(res.body).toEqual(expect.arrayContaining([data.product[0]]));
       });
     });
   });
@@ -737,7 +736,7 @@ describe('Filtering API', () => {
           },
         });
 
-        expect(res.body).toEqual(expect.arrayContaining([data.products[0], data.products[1]]));
+        expect(res.body).toEqual(expect.arrayContaining([data.product[0], data.product[1]]));
       });
 
       test('Supports simple or on different fields', async () => {
@@ -759,7 +758,7 @@ describe('Filtering API', () => {
         });
 
         expect(res.body).toEqual(
-          expect.arrayContaining([data.products[0], data.products[1], data.products[2]])
+          expect.arrayContaining([data.product[0], data.product[1], data.product[2]])
         );
       });
 
@@ -786,7 +785,7 @@ describe('Filtering API', () => {
           },
         });
 
-        expect(res.body).toEqual(expect.arrayContaining([data.products[0], data.products[2]]));
+        expect(res.body).toEqual(expect.arrayContaining([data.product[0], data.product[2]]));
       });
 
       test('Supports or with nested or', async () => {
@@ -816,7 +815,7 @@ describe('Filtering API', () => {
           },
         });
 
-        expect(res.body).toEqual(expect.arrayContaining([data.products[0], data.products[2]]));
+        expect(res.body).toEqual(expect.arrayContaining([data.product[0], data.product[2]]));
       });
     });
 
@@ -829,7 +828,7 @@ describe('Filtering API', () => {
         },
       });
 
-      expect(res.body).toEqual(expect.arrayContaining([data.products[0]]));
+      expect(res.body).toEqual(expect.arrayContaining([data.product[0]]));
     });
 
     test('Filter not equals', async () => {
@@ -841,7 +840,7 @@ describe('Filtering API', () => {
         },
       });
 
-      expect(res.body).toEqual(expect.arrayContaining([data.products[0]]));
+      expect(res.body).toEqual(expect.arrayContaining([data.product[0]]));
     });
 
     test('Filter contains insensitive', async () => {
@@ -853,7 +852,7 @@ describe('Filtering API', () => {
         },
       });
 
-      expect(res.body).toEqual(expect.arrayContaining([data.products[0]]));
+      expect(res.body).toEqual(expect.arrayContaining([data.product[0]]));
     });
 
     test('Filter not contains insensitive', async () => {
@@ -865,7 +864,7 @@ describe('Filtering API', () => {
         },
       });
 
-      expect(res.body).toEqual(expect.arrayContaining([data.products[0]]));
+      expect(res.body).toEqual(expect.arrayContaining([data.product[0]]));
     });
 
     test('Filter contains sensitive', async () => {
@@ -877,7 +876,7 @@ describe('Filtering API', () => {
         },
       });
 
-      expect(res.body).toEqual(expect.arrayContaining([data.products[0]]));
+      expect(res.body).toEqual(expect.arrayContaining([data.product[0]]));
     });
 
     test('Filter not contains sensitive', async () => {
@@ -889,7 +888,7 @@ describe('Filtering API', () => {
         },
       });
 
-      expect(res.body).toEqual(expect.arrayContaining([data.products[0]]));
+      expect(res.body).toEqual(expect.arrayContaining([data.product[0]]));
     });
 
     test('Filter greater than', async () => {
@@ -901,7 +900,7 @@ describe('Filtering API', () => {
         },
       });
 
-      expect(res.body).toEqual(expect.arrayContaining([data.products[0]]));
+      expect(res.body).toEqual(expect.arrayContaining([data.product[0]]));
     });
 
     test('Filter greater than or equal', async () => {
@@ -913,7 +912,7 @@ describe('Filtering API', () => {
         },
       });
 
-      expect(res.body).toEqual(expect.arrayContaining([data.products[0]]));
+      expect(res.body).toEqual(expect.arrayContaining([data.product[0]]));
     });
 
     test('Filter less than', async () => {
@@ -925,7 +924,7 @@ describe('Filtering API', () => {
         },
       });
 
-      expect(res.body).toEqual(expect.arrayContaining([data.products[0]]));
+      expect(res.body).toEqual(expect.arrayContaining([data.product[0]]));
     });
 
     test('Filter less than or equal', async () => {
@@ -937,7 +936,7 @@ describe('Filtering API', () => {
         },
       });
 
-      expect(res.body).toEqual(expect.arrayContaining([data.products[0]]));
+      expect(res.body).toEqual(expect.arrayContaining([data.product[0]]));
     });
   });
 
@@ -952,7 +951,7 @@ describe('Filtering API', () => {
         },
       });
 
-      expect(res.body).toEqual(expect.arrayContaining([data.products[0]]));
+      expect(res.body).toEqual(expect.arrayContaining([data.product[0]]));
 
       res = await rq({
         method: 'GET',
@@ -963,7 +962,7 @@ describe('Filtering API', () => {
         },
       });
 
-      expect(res.body).toEqual(expect.arrayContaining([data.products[0]]));
+      expect(res.body).toEqual(expect.arrayContaining([data.product[0]]));
 
       res = await rq({
         method: 'GET',
@@ -987,7 +986,7 @@ describe('Filtering API', () => {
         },
       });
 
-      expect(res.body).toEqual(expect.arrayContaining(data.products.slice(1)));
+      expect(res.body).toEqual(expect.arrayContaining(data.product.slice(1)));
 
       res = await rq({
         method: 'GET',
@@ -998,8 +997,8 @@ describe('Filtering API', () => {
         },
       });
 
-      expect(res.body).toEqual(expect.not.arrayContaining([data.products[1], data.products[2]]));
-      expect(res.body).toEqual(expect.arrayContaining([data.products[0]]));
+      expect(res.body).toEqual(expect.not.arrayContaining([data.product[1], data.product[2]]));
+      expect(res.body).toEqual(expect.arrayContaining([data.product[0]]));
 
       res = await rq({
         method: 'GET',
@@ -1023,7 +1022,7 @@ describe('Filtering API', () => {
         },
       });
 
-      expect(res.body).toEqual(expect.arrayContaining([data.products[0]]));
+      expect(res.body).toEqual(expect.arrayContaining([data.product[0]]));
     });
   });
 
@@ -1038,7 +1037,7 @@ describe('Filtering API', () => {
       });
 
       expect(res.body).toEqual(
-        expect.arrayContaining(data.products.slice(0).sort((a, b) => a.rank - b.rank))
+        expect.arrayContaining(data.product.slice(0).sort((a, b) => a.rank - b.rank))
       );
     });
 
@@ -1052,7 +1051,7 @@ describe('Filtering API', () => {
       });
 
       expect(res.body).toEqual(
-        expect.arrayContaining(data.products.slice(0).sort((a, b) => a.rank - b.rank))
+        expect.arrayContaining(data.product.slice(0).sort((a, b) => a.rank - b.rank))
       );
 
       const res2 = await rq({
@@ -1064,7 +1063,7 @@ describe('Filtering API', () => {
       });
 
       expect(res2.body).toEqual(
-        expect.arrayContaining(data.products.slice(0).sort((a, b) => b.rank - a.rank))
+        expect.arrayContaining(data.product.slice(0).sort((a, b) => b.rank - a.rank))
       );
     });
 
@@ -1077,11 +1076,9 @@ describe('Filtering API', () => {
         },
       });
 
-      [data.products[3], data.products[0], data.products[2], data.products[1]].forEach(
-        expectedPost => {
-          expect(res.body).toEqual(expect.arrayContaining([expectedPost]));
-        }
-      );
+      [data.product[3], data.product[0], data.product[2], data.product[1]].forEach(expectedPost => {
+        expect(res.body).toEqual(expect.arrayContaining([expectedPost]));
+      });
     });
   });
 
@@ -1095,7 +1092,7 @@ describe('Filtering API', () => {
         },
       });
 
-      expect(res.body).toEqual(expect.arrayContaining([data.products[0]]));
+      expect(res.body).toEqual(expect.arrayContaining([data.product[0]]));
     });
 
     test('Limit with sorting', async () => {
@@ -1108,7 +1105,7 @@ describe('Filtering API', () => {
         },
       });
 
-      expect(res.body).toEqual(expect.arrayContaining([data.products[data.products.length - 1]]));
+      expect(res.body).toEqual(expect.arrayContaining([data.product[data.product.length - 1]]));
     });
 
     test('Offset', async () => {
@@ -1120,7 +1117,7 @@ describe('Filtering API', () => {
         },
       });
 
-      expect(res.body).toEqual(expect.arrayContaining(data.products.slice(1)));
+      expect(res.body).toEqual(expect.arrayContaining(data.product.slice(1)));
     });
 
     test('Offset with limit', async () => {
@@ -1133,7 +1130,7 @@ describe('Filtering API', () => {
         },
       });
 
-      expect(res.body).toEqual(expect.arrayContaining(data.products.slice(1, 2)));
+      expect(res.body).toEqual(expect.arrayContaining(data.product.slice(1, 2)));
     });
   });
 
@@ -1147,7 +1144,7 @@ describe('Filtering API', () => {
         },
       });
 
-      expect(res.body).toEqual(expect.arrayContaining([data.products[4]]));
+      expect(res.body).toEqual(expect.arrayContaining([data.product[4]]));
     });
 
     test('Multi word query', async () => {
@@ -1159,7 +1156,7 @@ describe('Filtering API', () => {
         },
       });
 
-      expect(res.body).toEqual(expect.arrayContaining([data.products[0]]));
+      expect(res.body).toEqual(expect.arrayContaining([data.product[0]]));
     });
 
     test('Multi word cyrillic query', async () => {
@@ -1171,7 +1168,7 @@ describe('Filtering API', () => {
         },
       });
 
-      expect(res.body).toEqual(expect.arrayContaining([data.products[4]]));
+      expect(res.body).toEqual(expect.arrayContaining([data.product[4]]));
     });
   });
 });
