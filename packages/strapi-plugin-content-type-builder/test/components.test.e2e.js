@@ -1,14 +1,24 @@
-const { registerAndLogin } = require('../../../test/helpers/auth');
 const { createAuthRequest } = require('../../../test/helpers/request');
-const waitRestart = require('../../../test/helpers/waitRestart');
+const { createStrapiInstance } = require('../../../test/helpers/strapi');
 
+let strapi;
 let rq;
+
+const restart = async () => {
+  await strapi.destroy();
+  strapi = await createStrapiInstance({ ensureSuperAdmin: true });
+  rq = await createAuthRequest({ strapi });
+};
 
 describe('Content Type Builder - Components', () => {
   beforeAll(async () => {
-    const token = await registerAndLogin();
-    rq = createAuthRequest(token);
+    strapi = await createStrapiInstance({ ensureSuperAdmin: true });
+    rq = await createAuthRequest({ strapi });
   }, 60000);
+
+  afterAll(async () => {
+    await strapi.destroy();
+  });
 
   describe('POST /components', () => {
     test('Validates input and return 400 in case of invalid input', async () => {
@@ -59,7 +69,7 @@ describe('Content Type Builder - Components', () => {
         },
       });
 
-      await waitRestart();
+      await restart();
     }, 10000);
 
     test('Errors on already existing components', async () => {
@@ -211,7 +221,7 @@ describe('Content Type Builder - Components', () => {
         },
       });
 
-      await waitRestart();
+      await restart();
 
       const getRes = await rq({
         method: 'GET',
@@ -256,7 +266,7 @@ describe('Content Type Builder - Components', () => {
         },
       });
 
-      await waitRestart();
+      await restart();
 
       const tryGet = await rq({
         method: 'GET',
