@@ -1,46 +1,53 @@
-const { registerAndLogin } = require('../../../../test/helpers/auth');
-const createModelsUtils = require('../../../../test/helpers/models');
+'use strict';
+
+const { createTestBuilder } = require('../../../../test/helpers/builder');
+const { createStrapiInstance } = require('../../../../test/helpers/strapi');
 const { createAuthRequest } = require('../../../../test/helpers/request');
 
-let modelsUtils;
+let strapi;
 let rq;
 
-describe.each([
-  [
-    'CONTENT MANAGER',
-    '/content-manager/explorer/application::withcomponent.withcomponent',
-  ],
-  ['GENERATED API', '/withcomponents'],
-])('[%s] => Non repeatable and Not required component', (_, path) => {
-  beforeAll(async () => {
-    const token = await registerAndLogin();
-    const authRq = createAuthRequest(token);
+const component = {
+  name: 'somecomponent',
+  attributes: {
+    name: {
+      type: 'string',
+    },
+  },
+};
 
-    modelsUtils = createModelsUtils({ rq: authRq });
-
-    await modelsUtils.createComponent({
-      name: 'somecomponent',
-      attributes: {
-        name: {
-          type: 'string',
-        },
-      },
-    });
-
-    await modelsUtils.createContentTypeWithType('withcomponent', 'component', {
+const ct = {
+  name: 'withcomponent',
+  attributes: {
+    field: {
+      type: 'component',
       component: 'default.somecomponent',
       repeatable: false,
       required: false,
-    });
+    },
+  },
+};
 
-    rq = authRq.defaults({
-      baseUrl: `http://localhost:1337${path}`,
-    });
+describe.each([
+  ['CONTENT MANAGER', '/content-manager/explorer/application::withcomponent.withcomponent'],
+  ['GENERATED API', '/withcomponents'],
+])('[%s] => Non repeatable and Not required component', (_, path) => {
+  const builder = createTestBuilder();
+
+  beforeAll(async () => {
+    await builder
+      .addComponent(component)
+      .addContentType(ct)
+      .build();
+
+    strapi = await createStrapiInstance({ ensureSuperAdmin: true });
+    rq = await createAuthRequest({ strapi });
+    rq.setURLPrefix(path);
   }, 60000);
 
   afterAll(async () => {
-    await modelsUtils.deleteComponent('default.somecomponent');
-    await modelsUtils.deleteContentType('withcomponent');
+    await strapi.destroy();
+    await builder.cleanup();
   }, 60000);
 
   describe('POST new entry', () => {

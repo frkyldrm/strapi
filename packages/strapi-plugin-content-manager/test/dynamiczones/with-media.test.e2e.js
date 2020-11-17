@@ -1,18 +1,64 @@
 const fs = require('fs');
 
-const { registerAndLogin } = require('../../../../test/helpers/auth');
-const createModelsUtils = require('../../../../test/helpers/models');
+const { createTestBuilder } = require('../../../../test/helpers/builder');
+const { createStrapiInstance } = require('../../../../test/helpers/strapi');
 const { createAuthRequest } = require('../../../../test/helpers/request');
 
-let modelsUtils;
+let strapi;
 let rq;
-let authRq;
+let baseRq;
+
 const uploadImg = () => {
-  return authRq.post('/upload', {
+  return baseRq({
+    method: 'POST',
+    url: '/upload',
     formData: {
       files: fs.createReadStream(__dirname + '/rec.jpg'),
     },
   });
+};
+
+const components = {
+  singleMedia: {
+    name: 'single-media',
+    attributes: {
+      media: {
+        type: 'media',
+      },
+    },
+  },
+  multipleMedia: {
+    name: 'multiple-media',
+    attributes: {
+      media: {
+        type: 'media',
+        multiple: true,
+      },
+    },
+  },
+  withNested: {
+    name: 'with-nested',
+    attributes: {
+      singleMedia: {
+        type: 'component',
+        component: 'default.single-media',
+      },
+      multipleMedia: {
+        type: 'component',
+        component: 'default.multiple-media',
+      },
+    },
+  },
+};
+
+const ct = {
+  name: 'withdynamiczonemedia',
+  attributes: {
+    field: {
+      type: 'dynamiczone',
+      components: ['default.single-media', 'default.multiple-media', 'default.with-nested'],
+    },
+  },
 };
 
 describe.each([
@@ -22,59 +68,27 @@ describe.each([
   ],
   ['GENERATED API', '/withdynamiczonemedias'],
 ])('[%s] => Not required dynamiczone', (_, path) => {
+  const builder = createTestBuilder();
+
   beforeAll(async () => {
-    const token = await registerAndLogin();
-    authRq = createAuthRequest(token);
+    await builder
+      .addComponent(components.singleMedia)
+      .addComponent(components.multipleMedia)
+      .addComponent(components.withNested)
+      .addContentType(ct)
+      .build();
 
-    modelsUtils = createModelsUtils({ rq: authRq });
+    strapi = await createStrapiInstance({ ensureSuperAdmin: true });
 
-    await modelsUtils.createComponent({
-      name: 'single-media',
-      attributes: {
-        media: {
-          type: 'media',
-        },
-      },
-    });
+    baseRq = await createAuthRequest({ strapi });
 
-    await modelsUtils.createComponent({
-      name: 'multiple-media',
-      attributes: {
-        media: {
-          type: 'media',
-          multiple: true,
-        },
-      },
-    });
-
-    await modelsUtils.createComponent({
-      name: 'with-nested',
-      attributes: {
-        singleMedia: {
-          type: 'component',
-          component: 'default.single-media',
-        },
-        multipleMedia: {
-          type: 'component',
-          component: 'default.multiple-media',
-        },
-      },
-    });
-
-    await modelsUtils.createContentTypeWithType('withdynamiczonemedia', 'dynamiczone', {
-      components: ['default.single-media', 'default.multiple-media', 'default.with-nested'],
-    });
-
-    rq = authRq.defaults({
-      baseUrl: `http://localhost:1337${path}`,
-    });
+    rq = await createAuthRequest({ strapi });
+    rq.setURLPrefix(path);
   }, 60000);
 
   afterAll(async () => {
-    await modelsUtils.deleteComponent('default.with-nested');
-    await modelsUtils.deleteComponent('default.single-media');
-    await modelsUtils.deleteComponent('default.multiple-media');
-    await modelsUtils.deleteContentType('withdynamiczonemedia');
+    await strapi.destroy();
+    await builder.cleanup();
   }, 60000);
 
   describe('Contains components with medias', () => {
@@ -84,7 +98,9 @@ describe.each([
       expect(imgRes.statusCode).toBe(200);
       const mediaId = imgRes.body[0].id;
 
-      const res = await rq.post('/', {
+      const res = await rq({
+        method: 'POST',
+        url: '/',
         body: {
           field: [
             {
@@ -131,7 +147,9 @@ describe.each([
       expect(imgRes.statusCode).toBe(200);
       const mediaId = imgRes.body[0].id;
 
-      const res = await rq.post('/', {
+      const res = await rq({
+        method: 'POST',
+        url: '/',
         body: {
           field: [
             {
@@ -153,7 +171,9 @@ describe.each([
 
       expect(newImgRes.statusCode).toBe(200);
       const newMediaId = newImgRes.body[0].id;
-      const updateRes = await rq.put(`/${res.body.id}`, {
+      const updateRes = await rq({
+        method: 'PUT',
+        url: `/${res.body.id}`,
         body: {
           field: [
             {
@@ -198,7 +218,9 @@ describe.each([
       expect(imgRes.statusCode).toBe(200);
       const mediaId = imgRes.body[0].id;
 
-      const res = await rq.post('/', {
+      const res = await rq({
+        method: 'POST',
+        url: '/',
         body: {
           field: [
             {
@@ -215,7 +237,7 @@ describe.each([
 
       expect(res.statusCode).toBe(200);
 
-      const getRes = await rq.get(`/${res.body.id}`);
+      const getRes = await rq({ method: 'GET', url: `/${res.body.id}` });
       expect(getRes.body).toMatchObject({
         field: [
           {
@@ -248,7 +270,9 @@ describe.each([
       expect(imgRes.statusCode).toBe(200);
       const mediaId = imgRes.body[0].id;
 
-      const res = await rq.post('/', {
+      const res = await rq({
+        method: 'POST',
+        url: '/',
         body: {
           field: [
             {

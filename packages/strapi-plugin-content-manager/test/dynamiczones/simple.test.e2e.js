@@ -1,8 +1,10 @@
-const { registerAndLogin } = require('../../../../test/helpers/auth');
-const createModelsUtils = require('../../../../test/helpers/models');
+'use strict';
+
+const { createTestBuilder } = require('../../../../test/helpers/builder');
+const { createStrapiInstance } = require('../../../../test/helpers/strapi');
 const { createAuthRequest } = require('../../../../test/helpers/request');
 
-let modelsUtils;
+let strapi;
 let rq;
 
 const defaultBody = {
@@ -20,14 +22,50 @@ const defaultBody = {
   ],
 };
 
+const models = {
+  ct: {
+    name: 'withdynamiczone',
+    attributes: {
+      field: {
+        type: 'dynamiczone',
+        components: ['default.compo-with-other-compo', 'default.simple-compo'],
+        required: false,
+        min: 2,
+        max: 5,
+      },
+    },
+  },
+  simpleCompo: {
+    name: 'simple-compo',
+    attributes: {
+      name: {
+        type: 'string',
+      },
+    },
+  },
+  otherCompo: {
+    name: 'compo-with-other-compo',
+    attributes: {
+      compo: {
+        type: 'component',
+        component: 'default.simple-compo',
+      },
+    },
+  },
+};
+
 const createEntry = () => {
-  return rq.post('/', {
+  return rq({
+    method: 'POST',
+    url: '/',
     body: defaultBody,
   });
 };
 
 const createEmpty = () => {
-  return rq.post('/', {
+  return rq({
+    method: 'POST',
+    url: '/',
     body: {
       field: [],
     },
@@ -35,62 +73,33 @@ const createEmpty = () => {
 };
 
 describe.each([
-  [
-    'CONTENT MANAGER',
-    '/content-manager/explorer/application::withdynamiczone.withdynamiczone',
-  ],
+  ['CONTENT MANAGER', '/content-manager/explorer/application::withdynamiczone.withdynamiczone'],
   ['GENERATED API', '/withdynamiczones'],
 ])('[%s] => Not required dynamiczone', (_, path) => {
+  const builder = createTestBuilder();
+
   beforeAll(async () => {
-    const token = await registerAndLogin();
-    const authRq = createAuthRequest(token);
+    await builder
+      .addComponent(models.simpleCompo)
+      .addComponent(models.otherCompo)
+      .addContentType(models.ct)
+      .build();
 
-    modelsUtils = createModelsUtils({ rq: authRq });
-
-    await modelsUtils.createComponent({
-      name: 'simple-compo',
-      attributes: {
-        name: {
-          type: 'string',
-        },
-      },
-    });
-
-    await modelsUtils.createComponent({
-      name: 'compo-with-other-compo',
-      attributes: {
-        compo: {
-          type: 'component',
-          component: 'default.simple-compo',
-        },
-      },
-    });
-
-    await modelsUtils.createContentTypeWithType(
-      'withdynamiczone',
-      'dynamiczone',
-      {
-        components: ['default.compo-with-other-compo', 'default.simple-compo'],
-        required: false,
-        min: 2,
-        max: 5,
-      }
-    );
-
-    rq = authRq.defaults({
-      baseUrl: `http://localhost:1337${path}`,
-    });
+    strapi = await createStrapiInstance({ ensureSuperAdmin: true });
+    rq = await createAuthRequest({ strapi });
+    rq.setURLPrefix(path);
   }, 60000);
 
   afterAll(async () => {
-    await modelsUtils.deleteComponent('default.simple-compo');
-    await modelsUtils.deleteComponent('default.compo-with-other-compo');
-    await modelsUtils.deleteContentType('withdynamiczone');
+    await strapi.destroy();
+    await builder.cleanup();
   }, 60000);
 
   describe('Creation', () => {
     test('Can create an entry with a dynamic zone and a nested compo', async () => {
-      const res = await rq.post('/', {
+      const res = await rq({
+        method: 'POST',
+        url: '/',
         body: {
           field: [
             {
@@ -129,7 +138,9 @@ describe.each([
     });
 
     test('Can create entry with empty dynamiczone if it is not required', async () => {
-      const res = await rq.post('/', {
+      const res = await rq({
+        method: 'POST',
+        url: '/',
         body: {
           field: [],
         },
@@ -141,7 +152,9 @@ describe.each([
     });
 
     test('Throw if min items is not respected', async () => {
-      const res = await rq.post('/', {
+      const res = await rq({
+        method: 'POST',
+        url: '/',
         body: {
           field: [
             {
@@ -156,7 +169,9 @@ describe.each([
     });
 
     test('Throws if max items is not respected', async () => {
-      const res = await rq.post('/', {
+      const res = await rq({
+        method: 'POST',
+        url: '/',
         body: {
           field: Array(10).fill({
             __component: 'default.simple-compo',
@@ -174,7 +189,7 @@ describe.each([
       const createRes = await createEntry();
       const entryId = createRes.body.id;
 
-      const res = await rq.get(`/${entryId}`);
+      const res = await rq({ method: 'GET', url: `/${entryId}` });
 
       expect(res.statusCode).toBe(200);
       expect(Array.isArray(res.body.field)).toBe(true);
@@ -200,7 +215,7 @@ describe.each([
 
   describe('Listing entries', () => {
     test('The entries have their dynamic zones populated', async () => {
-      const res = await rq.get('/');
+      const res = await rq({ method: 'GET', url: '/' });
 
       expect(res.statusCode).toBe(200);
       expect(Array.isArray(res.body)).toBe(true);
@@ -226,7 +241,9 @@ describe.each([
       expect(createRes.statusCode).toBe(200);
       const entryId = createRes.body.id;
 
-      const res = await rq.put(`/${entryId}`, {
+      const res = await rq({
+        method: 'PUT',
+        url: `/${entryId}`,
         body: {
           field: [],
         },
@@ -243,7 +260,9 @@ describe.each([
       expect(createRes.statusCode).toBe(200);
       const entryId = createRes.body.id;
 
-      const res = await rq.put(`/${entryId}`, {
+      const res = await rq({
+        method: 'PUT',
+        url: `/${entryId}`,
         body: defaultBody,
       });
 
@@ -274,7 +293,9 @@ describe.each([
       expect(createRes.statusCode).toBe(200);
       const entryId = createRes.body.id;
 
-      const res = await rq.put(`/${entryId}`, {
+      const res = await rq({
+        method: 'PUT',
+        url: `/${entryId}`,
         body: {
           field: [
             {
@@ -313,7 +334,9 @@ describe.each([
       expect(createRes.statusCode).toBe(200);
       const entryId = createRes.body.id;
 
-      const res = await rq.put(`/${entryId}`, {
+      const res = await rq({
+        method: 'PUT',
+        url: `/${entryId}`,
         body: {
           field: [
             {
@@ -333,7 +356,9 @@ describe.each([
       expect(createRes.statusCode).toBe(200);
       const entryId = createRes.body.id;
 
-      const res = await rq.put(`/${entryId}`, {
+      const res = await rq({
+        method: 'PUT',
+        url: `/${entryId}`,
         body: {
           field: Array(10).fill({
             __component: 'default.simple-compo',
@@ -353,7 +378,7 @@ describe.each([
       expect(createRes.statusCode).toBe(200);
       const entryId = createRes.body.id;
 
-      const res = await rq.delete(`/${entryId}`);
+      const res = await rq({ method: 'DELETE', url: `/${entryId}` });
 
       expect(res.statusCode).toBe(200);
       expect(Array.isArray(res.body.field)).toBe(true);

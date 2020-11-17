@@ -1,4 +1,4 @@
-jest.mock('node-fetch');
+jest.mock('node-fetch', () => jest.fn(() => Promise.resolve()));
 
 const metrics = require('../index');
 const fetch = require('node-fetch');

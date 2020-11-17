@@ -1,11 +1,12 @@
 const _ = require('lodash');
 
-const { registerAndLogin } = require('../../../../test/helpers/auth');
-const createModelsUtils = require('../../../../test/helpers/models');
+const { createTestBuilder } = require('../../../../test/helpers/builder');
+const { createStrapiInstance } = require('../../../../test/helpers/strapi');
 const { createAuthRequest } = require('../../../../test/helpers/request');
 
+const builder = createTestBuilder();
+let strapi;
 let rq;
-let modelsUtils;
 let data = {
   productsWithDz: [],
 };
@@ -47,24 +48,18 @@ const productWithDz = {
 
 describe('Core API - Basic + dz', () => {
   beforeAll(async () => {
-    const token = await registerAndLogin();
-    rq = createAuthRequest(token);
+    await builder
+      .addComponent(compo)
+      .addContentType(productWithDz)
+      .build();
 
-    modelsUtils = createModelsUtils({ rq });
-    await modelsUtils.createComponent(compo);
-    await modelsUtils.createContentTypes([productWithDz]);
+    strapi = await createStrapiInstance({ ensureSuperAdmin: true });
+    rq = await createAuthRequest({ strapi });
   }, 60000);
 
   afterAll(async () => {
-    // clean database
-    const queryString = data.productsWithDz.map((p, i) => `${i}=${p.id}`).join('&');
-    await rq({
-      method: 'DELETE',
-      url: `/content-manager/explorer/deleteAll/application::product-with-dz.product-with-dz?${queryString}`,
-    });
-
-    await modelsUtils.deleteComponent('default.compo');
-    await modelsUtils.deleteContentTypes(['product-with-dz']);
+    await strapi.destroy();
+    await builder.cleanup();
   }, 60000);
 
   test('Create product with compo', async () => {

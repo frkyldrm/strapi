@@ -2,12 +2,14 @@
 
 const _ = require('lodash');
 
-const { registerAndLogin } = require('../../../test/helpers/auth');
+const { createTestBuilder } = require('../../../test/helpers/builder');
+const { createStrapiInstance } = require('../../../test/helpers/strapi');
 const { createAuthRequest } = require('../../../test/helpers/request');
-const createModelsUtils = require('../../../test/helpers/models');
+const modelsUtils = require('../../../test/helpers/models');
 
+let builder;
+let strapi;
 let rq;
-let modelsUtils;
 let data = {
   dogs: [],
 };
@@ -34,6 +36,12 @@ const dogs = [
   },
 ];
 
+const restart = async () => {
+  await strapi.destroy();
+  strapi = await createStrapiInstance({ ensureSuperAdmin: true });
+  rq = await createAuthRequest({ strapi });
+};
+
 const sortDogs = dogs => _.sortBy(dogs, 'name');
 
 describe('Migration - draft and publish', () => {
@@ -42,30 +50,20 @@ describe('Migration - draft and publish', () => {
     ['with table modifications', { town: { type: 'string' } }, { color: { type: 'string' } }],
   ])('%p', (testName, tableModification1, tableModification2) => {
     beforeAll(async () => {
-      data.dogs = [];
-      const token = await registerAndLogin();
-      rq = createAuthRequest(token);
-      modelsUtils = createModelsUtils({ rq });
-      await modelsUtils.createContentTypes([dogModel]);
-      const createdDogs = [];
-      for (const dog of dogs) {
-        const res = await rq({
-          method: 'POST',
-          url: '/content-manager/explorer/application::dog.dog',
-          body: dog,
-        });
-        createdDogs.push(res.body);
-      }
-      data.dogs = sortDogs(createdDogs);
+      builder = await createTestBuilder()
+        .addContentType(dogModel)
+        .addFixtures(dogModel.name, dogs)
+        .build();
+
+      strapi = await createStrapiInstance({ ensureSuperAdmin: true });
+      rq = await createAuthRequest({ strapi });
+
+      data.dogs = sortDogs(builder.sanitizedFixturesFor(dogModel.name, strapi));
     }, 60000);
 
     afterAll(async () => {
-      const queryString = data.dogs.map((p, i) => `${i}=${p.id}`).join('&');
-      await rq({
-        method: 'DELETE',
-        url: `/content-manager/explorer/deleteAll/application::dog.dog?${queryString}`,
-      });
-      await modelsUtils.deleteContentTypes(['dog']);
+      await strapi.destroy();
+      await builder.cleanup();
     }, 60000);
 
     describe('Enabling D&P on a content-type', () => {
@@ -83,12 +81,18 @@ describe('Migration - draft and publish', () => {
       });
 
       test('Published_at is equal to created_at after enabling the feature', async () => {
-        const schema = await modelsUtils.getContentTypeSchema('dog');
-        await modelsUtils.modifyContentType({
-          ...schema,
-          attributes: _.merge(schema.attributes, tableModification1),
-          draftAndPublish: true,
-        });
+        const schema = await modelsUtils.getContentTypeSchema(dogModel.name, { strapi });
+
+        await modelsUtils.modifyContentType(
+          {
+            ...schema,
+            attributes: _.merge(schema.attributes, tableModification1),
+            draftAndPublish: true,
+          },
+          { strapi }
+        );
+
+        await restart();
 
         let { body } = await rq({
           url: '/content-manager/explorer/application::dog.dog',
@@ -114,12 +118,19 @@ describe('Migration - draft and publish', () => {
         });
         data.dogs[1] = res.body;
 
-        const schema = await modelsUtils.getContentTypeSchema('dog');
-        await modelsUtils.modifyContentType({
-          ...schema,
-          draftAndPublish: false,
-          attributes: _.merge(schema.attributes, tableModification2),
-        });
+        const schema = await modelsUtils.getContentTypeSchema(dogModel.name, { strapi });
+
+        await modelsUtils.modifyContentType(
+          {
+            ...schema,
+            draftAndPublish: false,
+            attributes: _.merge(schema.attributes, tableModification2),
+          },
+          { strapi }
+        );
+
+        await restart();
+
         // drafts should have been deleted with the migration, so we remove them
         data.dogs = data.dogs.filter(dog => !_.isNil(dog.published_at));
 

@@ -1,20 +1,24 @@
 // Helpers.
-const { registerAndLogin } = require('../../../test/helpers/auth');
-
+const { createStrapiInstance } = require('../../../test/helpers/strapi');
 const { createAuthRequest, createRequest } = require('../../../test/helpers/request');
 
+let strapi;
 let authReq;
 const data = {};
 
 describe('Test Graphql user service', () => {
   beforeAll(async () => {
-    const token = await registerAndLogin();
-    authReq = createAuthRequest(token);
+    strapi = await createStrapiInstance({ ensureSuperAdmin: true });
+    authReq = await createAuthRequest({ strapi });
   }, 60000);
+
+  afterAll(async () => {
+    await strapi.destroy();
+  });
 
   describe('Check createUser authorizations', () => {
     test('createUser is forbidden to public', async () => {
-      const rq = createRequest();
+      const rq = createRequest({ strapi });
       const res = await rq({
         url: '/graphql',
         method: 'POST',
@@ -85,7 +89,7 @@ describe('Test Graphql user service', () => {
 
   describe('Check updateUser authorizations', () => {
     test('updateUser is forbidden to public', async () => {
-      const rq = createRequest();
+      const rq = createRequest({ strapi });
       const res = await rq({
         url: '/graphql',
         method: 'POST',
@@ -160,7 +164,7 @@ describe('Test Graphql user service', () => {
 
   describe('Check deleteUser authorizations', () => {
     test('deleteUser is forbidden to public', async () => {
-      const rq = createRequest();
+      const rq = createRequest({ strapi });
       const res = await rq({
         url: '/graphql',
         method: 'POST',

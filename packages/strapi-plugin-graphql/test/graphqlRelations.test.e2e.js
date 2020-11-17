@@ -1,12 +1,13 @@
 // Helpers.
-const { registerAndLogin } = require('../../../test/helpers/auth');
+const { createTestBuilder } = require('../../../test/helpers/builder');
+const { createStrapiInstance } = require('../../../test/helpers/strapi');
 const { createAuthRequest } = require('../../../test/helpers/request');
-const createModelsUtils = require('../../../test/helpers/models');
 const _ = require('lodash');
 
+const builder = createTestBuilder();
+let strapi;
 let rq;
 let graphqlQuery;
-let modelsUtils;
 
 // utils
 const selectFields = doc => _.pick(doc, ['id', 'name', 'color']);
@@ -104,8 +105,13 @@ const personModel = {
 
 describe('Test Graphql Relations API End to End', () => {
   beforeAll(async () => {
-    const token = await registerAndLogin();
-    rq = createAuthRequest(token);
+    await builder
+      .addComponent(rgbColorComponent)
+      .addContentTypes([documentModel, labelModel, carModel, personModel])
+      .build();
+
+    strapi = await createStrapiInstance({ ensureSuperAdmin: true });
+    rq = await createAuthRequest({ strapi });
 
     graphqlQuery = body => {
       return rq({
@@ -114,14 +120,12 @@ describe('Test Graphql Relations API End to End', () => {
         body,
       });
     };
-
-    modelsUtils = createModelsUtils({ rq });
-
-    await modelsUtils.createComponent(rgbColorComponent);
-    await modelsUtils.createContentTypes([documentModel, labelModel, carModel, personModel]);
   }, 60000);
 
-  afterAll(() => modelsUtils.deleteContentTypes(['document', 'label', 'car', 'person']), 60000);
+  afterAll(async () => {
+    await strapi.destroy();
+    await builder.cleanup();
+  }, 60000);
 
   describe('Test relations features', () => {
     let data = {
