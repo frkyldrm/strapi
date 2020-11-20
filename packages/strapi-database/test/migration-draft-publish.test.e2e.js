@@ -107,7 +107,7 @@ describe('Migration - draft and publish', () => {
           expect(!isNaN(new Date(dog.published_at).valueOf())).toBe(true);
         });
         data.dogs = sortedBody;
-      });
+      }, 60000);
     });
 
     describe('Disabling D&P on a content-type', () => {
@@ -141,7 +141,7 @@ describe('Migration - draft and publish', () => {
         expect(body.length).toBe(1);
         expect(body[0]).toMatchObject(_.pick(data.dogs[0], ['name']));
         expect(body[0].published_at).toBeUndefined();
-      });
+      }, 60000);
     });
   });
 });
