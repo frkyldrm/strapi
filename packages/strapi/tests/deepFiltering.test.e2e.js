@@ -86,7 +86,7 @@ describe('Deep Filtering API', () => {
       .addFixtures(collector.name, fixtures.collector)
       .build();
 
-    strapi = await createStrapiInstance({ ensureSuperAdmin: true });
+    strapi = await createStrapiInstance();
     rq = await createAuthRequest({ strapi });
 
     Object.assign(data, builder.sanitizedFixtures(strapi));
