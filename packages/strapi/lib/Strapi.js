@@ -207,10 +207,6 @@ class Strapi {
       this.server.destroy();
     }
 
-    if (_.has(this, 'db')) {
-      await this.db.destroy();
-    }
-
     if (_.has(this, 'plugins.graphql')) {
       await this.plugins.graphql.destroy();
     }
@@ -220,6 +216,10 @@ class Strapi {
     }
 
     this.eventHub.removeAllListeners();
+
+    if (_.has(this, 'db')) {
+      await this.db.destroy();
+    }
 
     delete global.strapi;
   }
